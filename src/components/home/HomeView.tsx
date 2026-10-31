@@ -125,7 +125,7 @@ export const HomeView: React.FC = () => {
                     </div>
                     <div>
                       <span className="font-bold text-white text-xs block">Morning Shift</span>
-                      <span className="text-[11px] text-slate-400">09:00 AM - 12:00 PM • Dr. Shalini Sengupta</span>
+                      <span className="text-[11px] text-slate-400">09:00 AM - 12:00 PM • Dr. Abishek Raut</span>
                     </div>
                   </div>
                   <span className="text-xs font-mono font-bold text-amber-300 bg-amber-950/50 px-2 py-1 rounded-lg border border-amber-800/50">
@@ -157,7 +157,7 @@ export const HomeView: React.FC = () => {
                     </div>
                     <div>
                       <span className="font-bold text-white text-xs block">Evening Shift</span>
-                      <span className="text-[11px] text-slate-400">05:00 PM - 08:00 PM • Dr. Meera Kapoor</span>
+                      <span className="text-[11px] text-slate-400">05:00 PM - 08:00 PM • Dr. Suman Jha</span>
                     </div>
                   </div>
                   <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-950/50 px-2 py-1 rounded-lg border border-indigo-800/50">

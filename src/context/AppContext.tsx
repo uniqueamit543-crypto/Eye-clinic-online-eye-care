@@ -78,6 +78,26 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const safeGetStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return fallback;
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const safeSetStorage = (key: string, value: unknown): void => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch {
+    // Ignore storage errors (e.g. storage disabled or quota exceeded)
+  }
+};
+
 const DEMO_PATIENT: User = {
   id: 'patient-demo',
   name: 'Aditya Sharma',
@@ -89,8 +109,8 @@ const DEMO_PATIENT: User = {
 
 const DEMO_DOCTOR: User = {
   id: 'doc-1',
-  name: 'Dr. Shalini Sengupta',
-  email: 'shalini.sengupta@eyeclinic.org',
+  name: 'Dr. Abishek Raut',
+  email: 'abishek.raut@eyeclinic.org',
   phone: '+91 98110 54321',
   role: 'doctor',
   doctorSpecialty: 'Senior Consultant & Refractive Specialist',
@@ -114,50 +134,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeView, setActiveView] = useState<'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal' | 'about-niu'>('home');
 
   // Core collections initialized with persistence support
-  const [doctors, setDoctors] = useState<Doctor[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_doctors_v4');
-    return saved ? JSON.parse(saved) : INITIAL_DOCTORS;
-  });
+  const [doctors, setDoctors] = useState<Doctor[]>(() => 
+    safeGetStorage('eyeclinic_doctors_v5', INITIAL_DOCTORS)
+  );
 
-  const [slots, setSlots] = useState<TimeSlot[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_slots_v2');
-    return saved ? JSON.parse(saved) : INITIAL_SLOTS;
-  });
+  const [slots, setSlots] = useState<TimeSlot[]>(() => 
+    safeGetStorage('eyeclinic_slots_v2', INITIAL_SLOTS)
+  );
 
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_appointments_v3');
-    return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
-  });
+  const [appointments, setAppointments] = useState<Appointment[]>(() => 
+    safeGetStorage('eyeclinic_appointments_v4', INITIAL_APPOINTMENTS)
+  );
 
-  const [prescriptions, setPrescriptions] = useState<Prescription[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_prescriptions_v3');
-    return saved ? JSON.parse(saved) : INITIAL_PRESCRIPTIONS;
-  });
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>(() => 
+    safeGetStorage('eyeclinic_prescriptions_v4', INITIAL_PRESCRIPTIONS)
+  );
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_products_v2');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-  });
+  const [products, setProducts] = useState<Product[]>(() => 
+    safeGetStorage('eyeclinic_products_v2', INITIAL_PRODUCTS)
+  );
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_cart');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [cart, setCart] = useState<CartItem[]>(() => 
+    safeGetStorage('eyeclinic_cart', [])
+  );
 
-  const [wishlist, setWishlist] = useState<string[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_wishlist');
-    return saved ? JSON.parse(saved) : ['prod-1', 'prod-4'];
-  });
+  const [wishlist, setWishlist] = useState<string[]>(() => 
+    safeGetStorage('eyeclinic_wishlist', ['prod-1', 'prod-4'])
+  );
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_orders');
-    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-  });
+  const [orders, setOrders] = useState<Order[]>(() => 
+    safeGetStorage('eyeclinic_orders', INITIAL_ORDERS)
+  );
 
-  const [reviews, setReviews] = useState<PatientReview[]>(() => {
-    const saved = localStorage.getItem('eyeclinic_reviews_v2');
-    return saved ? JSON.parse(saved) : INITIAL_REVIEWS;
-  });
+  const [reviews, setReviews] = useState<PatientReview[]>(() => 
+    safeGetStorage('eyeclinic_reviews_v3', INITIAL_REVIEWS)
+  );
 
   // Modal controls
   const [activeModal, setActiveModal] = useState<string | null>(null);
@@ -167,39 +178,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync to local storage
   useEffect(() => {
-    localStorage.setItem('eyeclinic_doctors_v4', JSON.stringify(doctors));
+    safeSetStorage('eyeclinic_doctors_v5', doctors);
   }, [doctors]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_slots_v2', JSON.stringify(slots));
+    safeSetStorage('eyeclinic_slots_v2', slots);
   }, [slots]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_appointments_v3', JSON.stringify(appointments));
+    safeSetStorage('eyeclinic_appointments_v4', appointments);
   }, [appointments]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_prescriptions_v3', JSON.stringify(prescriptions));
+    safeSetStorage('eyeclinic_prescriptions_v4', prescriptions);
   }, [prescriptions]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_products_v2', JSON.stringify(products));
+    safeSetStorage('eyeclinic_products_v2', products);
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_cart', JSON.stringify(cart));
+    safeSetStorage('eyeclinic_cart', cart);
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_wishlist', JSON.stringify(wishlist));
+    safeSetStorage('eyeclinic_wishlist', wishlist);
   }, [wishlist]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_orders', JSON.stringify(orders));
+    safeSetStorage('eyeclinic_orders', orders);
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('eyeclinic_reviews_v2', JSON.stringify(reviews));
+    safeSetStorage('eyeclinic_reviews_v3', reviews);
   }, [reviews]);
 
   const showToast = (type: 'success' | 'info' | 'warning' | 'error', title: string, message: string) => {
@@ -224,7 +235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else if (role === 'doctor') {
       setCurrentUser(DEMO_DOCTOR);
       setActiveView('doctor-portal');
-      showToast('info', 'Switched to Doctor Portal', 'Logged in as Dr. Shalini Sengupta (Refractive Specialist)');
+      showToast('info', 'Switched to Doctor Portal', 'Logged in as Dr. Abishek Raut (Refractive Specialist)');
     } else if (role === 'admin') {
       setCurrentUser(DEMO_ADMIN);
       setActiveView('admin-panel');
