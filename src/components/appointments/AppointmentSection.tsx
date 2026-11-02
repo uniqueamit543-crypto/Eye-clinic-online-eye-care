@@ -26,9 +26,9 @@ export const AppointmentSection: React.FC = () => {
   } = useApp();
 
   // Patient inputs
-  const [patientName, setPatientName] = useState(currentUser.name || 'Aditya Sharma');
-  const [patientPhone, setPatientPhone] = useState(currentUser.phone || '+91 98765 43210');
-  const [patientEmail, setPatientEmail] = useState(currentUser.email || 'aditya.sharma@niu.edu.in');
+  const [patientName, setPatientName] = useState(currentUser?.name || 'Aditya Sharma');
+  const [patientPhone, setPatientPhone] = useState(currentUser?.phone || '+91 98765 43210');
+  const [patientEmail, setPatientEmail] = useState(currentUser?.email || 'aditya.sharma@example.com');
   const [patientAge, setPatientAge] = useState<number>(23);
   const [patientGender, setPatientGender] = useState<'Male' | 'Female' | 'Other'>('Male');
 

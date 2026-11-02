@@ -389,7 +389,7 @@ export const HomeView: React.FC = () => {
                     onClick={() => setActiveModal('book-appointment')}
                     className="w-full py-2.5 rounded-xl bg-teal-50 hover:bg-teal-600 text-teal-800 hover:text-white font-bold text-xs transition cursor-pointer"
                   >
-                    Book with {doc.name.split(' ')[1]}
+                    Book with {doc.name.split(' ')[1] || doc.name}
                   </button>
                 </div>
               </div>

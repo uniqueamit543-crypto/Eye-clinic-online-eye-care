@@ -1,15 +1,29 @@
 export type Role = 'patient' | 'doctor' | 'admin';
 
-export interface User {
+export interface UserAccount {
   id: string;
+  loginId: string;
+  password: string;
   name: string;
   email: string;
   phone: string;
   role: Role;
+  dateCreated: string;
   avatar?: string;
-  dateJoined: string;
   doctorSpecialty?: string;
+  doctorDegree?: string;
   doctorRoom?: string;
+  doctorShift?: ShiftType;
+  patientAge?: number;
+  patientGender?: 'Male' | 'Female' | 'Other';
+  bloodGroup?: string;
+}
+
+export interface User extends Omit<UserAccount, 'loginId' | 'password' | 'dateCreated'> {
+  loginId?: string;
+  password?: string;
+  dateCreated?: string;
+  dateJoined?: string;
 }
 
 export type ShiftType = 'Morning' | 'Afternoon' | 'Evening';

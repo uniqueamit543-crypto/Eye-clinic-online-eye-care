@@ -9,7 +9,11 @@ import {
   Stethoscope,
   ShieldCheck,
   Menu,
-  X
+  X,
+  LogIn,
+  LogOut,
+  KeyRound,
+  User
 } from 'lucide-react';
 import { Role } from '../types';
 
@@ -18,6 +22,8 @@ export const Navbar: React.FC = () => {
     currentRole,
     switchRole,
     currentUser,
+    isAuthenticated,
+    logout,
     cartTotal,
     wishlist,
     setActiveModal,
@@ -39,7 +45,7 @@ export const Navbar: React.FC = () => {
       id: 'doctor',
       label: 'Doctor',
       icon: <Stethoscope className="w-4 h-4" />,
-      badge: 'Dr. Shalini Sengupta',
+      badge: 'Dr. Abishek Raut',
       color: 'bg-sky-600 text-white'
     },
     {
@@ -67,14 +73,9 @@ export const Navbar: React.FC = () => {
                 <Eye className="w-6 h-6 stroke-[2.2]" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xl font-bold tracking-tight text-slate-900 font-heading">
-                    Eye<span className="text-teal-600">Clinic</span>
-                  </span>
-                  <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">
-                    Pro
-                  </span>
-                </div>
+                <span className="text-xl font-bold tracking-tight text-slate-900 font-heading">
+                  Eye<span className="text-teal-600">Clinic</span>
+                </span>
                 <p className="text-[11px] text-slate-500 leading-none">Online Eye Care & Optical Store</p>
               </div>
             </button>
@@ -161,7 +162,52 @@ export const Navbar: React.FC = () => {
           </nav>
 
           {/* Right Actions: Role Switcher Pill + Cart + Book CTA */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* User Account / Login ID Chip */}
+            {isAuthenticated ? (
+              <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 rounded-xl p-1 pr-2 shadow-2xs">
+                <button
+                  onClick={() => setActiveModal('auth')}
+                  title="Manage Login ID / Switch Account"
+                  className="flex items-center gap-2 cursor-pointer text-left group"
+                >
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-xs transition group-hover:scale-105 ${
+                    currentRole === 'patient'
+                      ? 'bg-emerald-600'
+                      : currentRole === 'doctor'
+                      ? 'bg-sky-600'
+                      : 'bg-indigo-600'
+                  }`}>
+                    {currentUser?.name?.charAt(0) || 'U'}
+                  </div>
+                  <div className="hidden xl:block leading-tight pr-1">
+                    <div className="text-xs font-semibold text-slate-800 truncate max-w-[110px]">
+                      {currentUser?.name}
+                    </div>
+                    <div className="text-[10px] text-teal-700 font-mono font-medium">
+                      @{currentUser?.loginId || 'user'}
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={logout}
+                  title="Sign Out"
+                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setActiveModal('auth')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In / Register</span>
+              </button>
+            )}
+
             {/* Quick Interactive Role Switcher */}
             <div className="hidden sm:flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Role:</span>

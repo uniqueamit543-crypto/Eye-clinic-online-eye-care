@@ -3,14 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EyeClinic | Redirecting...</title>
+    <title>EyeClinic | Page Not Found</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d9488' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E" />
     <script>
-      // Single Page Application redirect for GitHub Pages
-      sessionStorage.redirect = location.href;
-      window.location.replace('./');
+      // Safe SPA redirect without infinite loops
+      try {
+        var redirected = sessionStorage.getItem('eyeclinic_redirected');
+        if (!redirected) {
+          sessionStorage.setItem('eyeclinic_redirected', 'true');
+          // For GitHub Pages: redirect to the repository root directory
+          var path = window.location.pathname;
+          var segments = path.split('/').filter(Boolean);
+          var repoRoot = segments.length > 0 ? '/' + segments[0] + '/' : '/';
+          window.location.replace(repoRoot);
+        }
+      } catch (e) {
+        // Fallback if sessionStorage is disabled/blocked in iframe
+      }
     </script>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #0f172a;
+        color: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px;
+        text-align: center;
+      }
+      .card {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 20px;
+        padding: 40px 32px;
+        max-width: 480px;
+        width: 100%;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+      }
+      .logo {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #0d9488, #06b6d4);
+        margin: 0 auto 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+      }
+      h1 { font-size: 22px; font-weight: 700; margin: 0 0 10px; color: #2dd4bf; }
+      p { font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 24px; }
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #0d9488;
+        color: #ffffff;
+        padding: 12px 28px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+      a:hover { background: #14b8a6; }
+    </style>
   </head>
   <body>
-    <p>Redirecting to <a href="./">EyeClinic homepage</a>...</p>
+    <div class="card">
+      <div class="logo">👁️</div>
+      <h1>EyeClinic Online Portal</h1>
+      <p>The requested page was not found or is being redirected. Click below to return to the EyeClinic homepage.</p>
+      <a href="./" onclick="try{sessionStorage.removeItem('eyeclinic_redirected');}catch(e){}">Return to Homepage</a>
+    </div>
   </body>
 </html>

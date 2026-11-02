@@ -13,7 +13,10 @@ import {
   Download,
   Stethoscope,
   Sparkles,
-  MapPin
+  MapPin,
+  KeyRound,
+  Lock,
+  UserCheck
 } from 'lucide-react';
 import { Prescription } from '../../types';
 
@@ -26,11 +29,16 @@ export const PatientDashboard: React.FC = () => {
     setActiveModal,
     setActiveView,
     addReview,
+    resetPassword,
     showToast
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'appointments' | 'prescriptions' | 'orders'>('prescriptions');
   const [selectedRxForPrint, setSelectedRxForPrint] = useState<Prescription | null>(null);
+
+  // Password reset modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
 
   // Leave review form state
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -80,21 +88,34 @@ export const PatientDashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-teal-500/30 border-2 border-teal-300 flex items-center justify-center text-2xl font-bold font-mono text-teal-100">
-              {currentUser.name.charAt(0)}
+              {(currentUser?.name || 'User').charAt(0)}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/30 text-xs font-semibold">
                   Registered Patient
                 </span>
-                <span className="text-teal-200 text-xs font-mono">ID: {currentUser.id}</span>
+                <span className="text-teal-200 text-xs font-mono bg-teal-950/50 px-2 py-0.5 rounded border border-teal-800">
+                  Login ID: <strong className="text-white">@{currentUser?.loginId || 'patient_aditya'}</strong>
+                </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold font-heading mt-1">{currentUser.name}</h1>
-              <p className="text-xs text-teal-200">{currentUser.email} • {currentUser.phone}</p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold font-heading mt-1">{currentUser?.name || 'Patient'}</h1>
+              <p className="text-xs text-teal-200">{currentUser?.email || ''} • {currentUser?.phone || ''}</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => {
+                setShowPasswordModal(true);
+                setNewPasswordVal(currentUser?.password || '');
+              }}
+              className="px-3.5 py-2 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 hover:text-white font-medium text-xs border border-teal-400/30 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Change Password</span>
+            </button>
+
             <button
               onClick={() => setActiveModal('book-appointment')}
               className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer"
@@ -112,6 +133,70 @@ export const PatientDashboard: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Password change modal */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newPasswordVal.trim()) return;
+                resetPassword(currentUser.id, newPasswordVal.trim());
+                setShowPasswordModal(false);
+              }}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full text-slate-900 shadow-2xl space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-slate-900 text-sm font-heading flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-teal-600" />
+                  <span>Update Account Password</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="text-slate-400 hover:text-slate-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-3 bg-teal-50 rounded-xl border border-teal-100 text-xs text-teal-900">
+                <span>Account Login ID: </span>
+                <strong className="font-mono">@{currentUser?.loginId || 'patient_aditya'}</strong>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">New Password *</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newPasswordVal}
+                    onChange={(e) => setNewPasswordVal(e.target.value)}
+                    placeholder="Enter new password"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 text-xs text-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl cursor-pointer"
+                >
+                  Save New Password
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Quick summary stats */}
         <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-teal-800/80">

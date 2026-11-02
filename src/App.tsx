@@ -23,7 +23,6 @@ import { CartDrawer } from './components/shop/CartDrawer';
 import { CheckoutModal } from './components/shop/CheckoutModal';
 import { VirtualTryOnModal } from './components/future/VirtualTryOnModal';
 import { AIFrameRecommendationModal } from './components/future/AIFrameRecommendationModal';
-import { ProjectSynopsisModal } from './components/project/ProjectSynopsisModal';
 import { Toast } from './components/common/Toast';
 
 const AppContent: React.FC = () => {
@@ -53,7 +52,6 @@ const AppContent: React.FC = () => {
       <CheckoutModal />
       <VirtualTryOnModal />
       <AIFrameRecommendationModal />
-      <ProjectSynopsisModal />
       <Toast />
     </div>
   );

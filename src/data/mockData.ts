@@ -1,4 +1,99 @@
-import { Doctor, Product, TimeSlot, Appointment, Prescription, PatientReview, Order } from '../types';
+import { Doctor, Product, TimeSlot, Appointment, Prescription, PatientReview, Order, UserAccount } from '../types';
+
+export const INITIAL_ACCOUNTS: UserAccount[] = [
+  {
+    id: 'patient-demo',
+    loginId: 'patient_aditya',
+    password: 'patient123',
+    name: 'Aditya Sharma',
+    email: 'aditya.sharma@example.com',
+    phone: '+91 98765 43210',
+    role: 'patient',
+    dateCreated: '2026-09-12',
+    patientAge: 32,
+    patientGender: 'Male',
+    bloodGroup: 'B+'
+  },
+  {
+    id: 'patient-2',
+    loginId: 'patient_priya',
+    password: 'patient123',
+    name: 'Priya Patel',
+    email: 'priya.patel@example.com',
+    phone: '+91 98112 34567',
+    role: 'patient',
+    dateCreated: '2026-10-01',
+    patientAge: 27,
+    patientGender: 'Female',
+    bloodGroup: 'O+'
+  },
+  {
+    id: 'doc-1',
+    loginId: 'doc_abishek',
+    password: 'doctor123',
+    name: 'Dr. Abishek Raut',
+    email: 'abishek.raut@eyeclinic.org',
+    phone: '+91 98110 54321',
+    role: 'doctor',
+    doctorSpecialty: 'Senior Consultant & Refractive Specialist',
+    doctorDegree: 'MBBS, MS (Ophthalmology), FICO',
+    doctorRoom: 'Room 102 (OPD Wing A)',
+    doctorShift: 'Morning',
+    dateCreated: '2024-03-01'
+  },
+  {
+    id: 'doc-2',
+    loginId: 'doc_yuvraj',
+    password: 'doctor123',
+    name: 'Dr. Yuvraj Tiwari',
+    email: 'yuvraj.tiwari@eyeclinic.org',
+    phone: '+91 98220 12345',
+    role: 'doctor',
+    doctorSpecialty: 'Clinical Optometrist & Contact Lens Specialist',
+    doctorDegree: 'B.Optom, M.Optom (AIIMS)',
+    doctorRoom: 'Room 105 (Vision Therapy Wing)',
+    doctorShift: 'Afternoon',
+    dateCreated: '2024-04-10'
+  },
+  {
+    id: 'doc-3',
+    loginId: 'doc_suman',
+    password: 'doctor123',
+    name: 'Dr. Suman Jha',
+    email: 'suman.jha@eyeclinic.org',
+    phone: '+91 98330 67890',
+    role: 'doctor',
+    doctorSpecialty: 'Glaucoma & Pediatric Eye Specialist',
+    doctorDegree: 'MBBS, DO, DNB (Ophthalmology)',
+    doctorRoom: 'Room 201 (Diagnostic Wing)',
+    doctorShift: 'Evening',
+    dateCreated: '2024-05-15'
+  },
+  {
+    id: 'doc-4',
+    loginId: 'doc_arvind',
+    password: 'doctor123',
+    name: 'Dr. Arvind Singh',
+    email: 'arvind.singh@eyeclinic.org',
+    phone: '+91 98440 98765',
+    role: 'doctor',
+    doctorSpecialty: 'Computer Vision Syndrome & Dry Eye Care',
+    doctorDegree: 'B.Optom, Fellow in Low Vision Care',
+    doctorRoom: 'Room 104 (Wellness Lab)',
+    doctorShift: 'Evening',
+    dateCreated: '2024-06-20'
+  },
+  {
+    id: 'admin-super',
+    loginId: 'admin_master',
+    password: 'admin123',
+    name: 'Clinic Operations Admin',
+    email: 'admin@eyeclinic.org',
+    phone: '+91 99990 00112',
+    role: 'admin',
+    dateCreated: '2024-01-01'
+  }
+];
 
 export const INITIAL_DOCTORS: Doctor[] = [
   {

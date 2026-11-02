@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import {
   Role,
   User,
+  UserAccount,
   Doctor,
   Product,
   TimeSlot,
@@ -15,6 +16,7 @@ import {
   OrderStatus
 } from '../types';
 import {
+  INITIAL_ACCOUNTS,
   INITIAL_DOCTORS,
   INITIAL_PRODUCTS,
   INITIAL_SLOTS,
@@ -34,6 +36,15 @@ interface ToastNotification {
 interface AppContextType {
   currentUser: User;
   currentRole: Role;
+  isAuthenticated: boolean;
+  accounts: UserAccount[];
+  login: (loginId: string, password: string) => { success: boolean; message: string; role?: Role };
+  registerAccount: (accountData: Omit<UserAccount, 'id' | 'dateCreated'>) => { success: boolean; message: string; account?: UserAccount };
+  logout: () => void;
+  adminCreateAccount: (accountData: Omit<UserAccount, 'id' | 'dateCreated'>) => { success: boolean; message: string; account?: UserAccount };
+  adminDeleteAccount: (accountId: string) => void;
+  resetPassword: (accountId: string, newPassword: string) => void;
+  updateProfile: (accountId: string, updates: Partial<UserAccount>) => void;
   switchRole: (role: Role) => void;
   doctors: Doctor[];
   addDoctor: (doctor: Doctor) => void;
@@ -70,8 +81,8 @@ interface AppContextType {
   setSelectedProduct: (product: Product | null) => void;
   selectedAppointmentForRx: Appointment | null;
   setSelectedAppointmentForRx: (apt: Appointment | null) => void;
-  activeView: 'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal' | 'about-niu';
-  setActiveView: (view: 'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal' | 'about-niu') => void;
+  activeView: 'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal';
+  setActiveView: (view: 'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal') => void;
   toast: ToastNotification | null;
   showToast: (type: 'success' | 'info' | 'warning' | 'error', title: string, message: string) => void;
 }
@@ -82,7 +93,10 @@ const safeGetStorage = <T,>(key: string, fallback: T): T => {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return fallback;
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }
@@ -101,7 +115,7 @@ const safeSetStorage = (key: string, value: unknown): void => {
 const DEMO_PATIENT: User = {
   id: 'patient-demo',
   name: 'Aditya Sharma',
-  email: 'aditya.sharma@niu.edu.in',
+  email: 'aditya.sharma@example.com',
   phone: '+91 98765 43210',
   role: 'patient',
   dateJoined: '2026-09-12'
@@ -120,54 +134,72 @@ const DEMO_DOCTOR: User = {
 
 const DEMO_ADMIN: User = {
   id: 'admin-super',
-  name: 'NIU Clinic Operations Admin',
-  email: 'admin.eyeclinic@niu.edu.in',
+  name: 'Clinic Operations Admin',
+  email: 'admin@eyeclinic.org',
   phone: '+91 99990 00112',
   role: 'admin',
   dateJoined: '2024-01-01'
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current user & role
-  const [currentRole, setCurrentRole] = useState<Role>('patient');
-  const [currentUser, setCurrentUser] = useState<User>(DEMO_PATIENT);
-  const [activeView, setActiveView] = useState<'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal' | 'about-niu'>('home');
+  // Accounts with Login ID & Password
+  const [accounts, setAccounts] = useState<UserAccount[]>(() => 
+    safeGetStorage('eyeclinic_accounts_v8', INITIAL_ACCOUNTS)
+  );
 
-  // Core collections initialized with persistence support
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => 
+    safeGetStorage('eyeclinic_auth_v8', true)
+  );
+
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    const savedUser = safeGetStorage<UserAccount | null>('eyeclinic_active_user_v8', null);
+    if (savedUser) return savedUser;
+    const initialPatient = INITIAL_ACCOUNTS.find(a => a.role === 'patient') || INITIAL_ACCOUNTS[0];
+    return initialPatient;
+  });
+
+  const [currentRole, setCurrentRole] = useState<Role>(() => {
+    const savedUser = safeGetStorage<UserAccount | null>('eyeclinic_active_user_v8', null);
+    return savedUser ? savedUser.role : 'patient';
+  });
+
+  const [activeView, setActiveView] = useState<'home' | 'catalogue' | 'appointments' | 'doctor-portal' | 'admin-panel' | 'patient-portal'>('home');
+
+  // Core collections initialized with persistence support (v7 versioning)
   const [doctors, setDoctors] = useState<Doctor[]>(() => 
-    safeGetStorage('eyeclinic_doctors_v5', INITIAL_DOCTORS)
+    safeGetStorage('eyeclinic_doctors_v7', INITIAL_DOCTORS)
   );
 
   const [slots, setSlots] = useState<TimeSlot[]>(() => 
-    safeGetStorage('eyeclinic_slots_v2', INITIAL_SLOTS)
+    safeGetStorage('eyeclinic_slots_v7', INITIAL_SLOTS)
   );
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => 
-    safeGetStorage('eyeclinic_appointments_v4', INITIAL_APPOINTMENTS)
+    safeGetStorage('eyeclinic_appointments_v7', INITIAL_APPOINTMENTS)
   );
 
   const [prescriptions, setPrescriptions] = useState<Prescription[]>(() => 
-    safeGetStorage('eyeclinic_prescriptions_v4', INITIAL_PRESCRIPTIONS)
+    safeGetStorage('eyeclinic_prescriptions_v7', INITIAL_PRESCRIPTIONS)
   );
 
   const [products, setProducts] = useState<Product[]>(() => 
-    safeGetStorage('eyeclinic_products_v2', INITIAL_PRODUCTS)
+    safeGetStorage('eyeclinic_products_v7', INITIAL_PRODUCTS)
   );
 
   const [cart, setCart] = useState<CartItem[]>(() => 
-    safeGetStorage('eyeclinic_cart', [])
+    safeGetStorage('eyeclinic_cart_v7', [])
   );
 
   const [wishlist, setWishlist] = useState<string[]>(() => 
-    safeGetStorage('eyeclinic_wishlist', ['prod-1', 'prod-4'])
+    safeGetStorage('eyeclinic_wishlist_v7', ['prod-1', 'prod-4'])
   );
 
   const [orders, setOrders] = useState<Order[]>(() => 
-    safeGetStorage('eyeclinic_orders', INITIAL_ORDERS)
+    safeGetStorage('eyeclinic_orders_v7', INITIAL_ORDERS)
   );
 
   const [reviews, setReviews] = useState<PatientReview[]>(() => 
-    safeGetStorage('eyeclinic_reviews_v3', INITIAL_REVIEWS)
+    safeGetStorage('eyeclinic_reviews_v7', INITIAL_REVIEWS)
   );
 
   // Modal controls
@@ -178,40 +210,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync to local storage
   useEffect(() => {
-    safeSetStorage('eyeclinic_doctors_v5', doctors);
+    safeSetStorage('eyeclinic_doctors_v7', doctors);
   }, [doctors]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_slots_v2', slots);
+    safeSetStorage('eyeclinic_slots_v7', slots);
   }, [slots]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_appointments_v4', appointments);
+    safeSetStorage('eyeclinic_appointments_v7', appointments);
   }, [appointments]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_prescriptions_v4', prescriptions);
+    safeSetStorage('eyeclinic_prescriptions_v7', prescriptions);
   }, [prescriptions]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_products_v2', products);
+    safeSetStorage('eyeclinic_products_v7', products);
   }, [products]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_cart', cart);
+    safeSetStorage('eyeclinic_cart_v7', cart);
   }, [cart]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_wishlist', wishlist);
+    safeSetStorage('eyeclinic_wishlist_v7', wishlist);
   }, [wishlist]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_orders', orders);
+    safeSetStorage('eyeclinic_orders_v7', orders);
   }, [orders]);
 
   useEffect(() => {
-    safeSetStorage('eyeclinic_reviews_v3', reviews);
+    safeSetStorage('eyeclinic_reviews_v7', reviews);
   }, [reviews]);
+
+  useEffect(() => {
+    safeSetStorage('eyeclinic_accounts_v8', accounts);
+  }, [accounts]);
+
+  useEffect(() => {
+    safeSetStorage('eyeclinic_active_user_v8', currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    safeSetStorage('eyeclinic_auth_v8', isAuthenticated);
+  }, [isAuthenticated]);
 
   const showToast = (type: 'success' | 'info' | 'warning' | 'error', title: string, message: string) => {
     setToast({
@@ -225,21 +269,185 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
+  // Authentication: Login with Login ID and Password
+  const login = (loginId: string, pass: string): { success: boolean; message: string; role?: Role } => {
+    const cleanId = loginId.trim().toLowerCase();
+    const found = accounts.find(
+      a => (a.loginId.toLowerCase() === cleanId || a.email.toLowerCase() === cleanId) && a.password === pass
+    );
+
+    if (!found) {
+      showToast('error', 'Login Failed', 'Invalid Login ID or Password. Please check credentials or register.');
+      return { success: false, message: 'Invalid Login ID or Password. Please check your credentials.' };
+    }
+
+    setCurrentUser(found);
+    setCurrentRole(found.role);
+    setIsAuthenticated(true);
+
+    if (found.role === 'patient') {
+      setActiveView('patient-portal');
+    } else if (found.role === 'doctor') {
+      setActiveView('doctor-portal');
+    } else if (found.role === 'admin') {
+      setActiveView('admin-panel');
+    }
+
+    showToast('success', 'Welcome Back!', `Logged in successfully as ${found.name} (${found.role.toUpperCase()})`);
+    return { success: true, message: `Welcome back, ${found.name}!`, role: found.role };
+  };
+
+  // Authentication: Create Account / Register with Login ID & Password
+  const registerAccount = (
+    accountData: Omit<UserAccount, 'id' | 'dateCreated'>
+  ): { success: boolean; message: string; account?: UserAccount } => {
+    const cleanId = accountData.loginId.trim().toLowerCase();
+    if (!cleanId) {
+      return { success: false, message: 'Login ID is required.' };
+    }
+    if (!accountData.password || accountData.password.length < 4) {
+      return { success: false, message: 'Password must be at least 4 characters long.' };
+    }
+
+    const exists = accounts.some(a => a.loginId.toLowerCase() === cleanId);
+    if (exists) {
+      return { success: false, message: `The Login ID "${accountData.loginId}" is already taken. Please choose another.` };
+    }
+
+    const newAccount: UserAccount = {
+      ...accountData,
+      id: `${accountData.role}-${Date.now().toString().slice(-6)}`,
+      loginId: accountData.loginId.trim(),
+      dateCreated: new Date().toISOString().split('T')[0]
+    };
+
+    setAccounts(prev => [newAccount, ...prev]);
+
+    // If registered as doctor, ensure doctor profile exists in roster
+    if (newAccount.role === 'doctor') {
+      const docExists = doctors.some(d => d.id === newAccount.id || d.name.toLowerCase() === newAccount.name.toLowerCase());
+      if (!docExists) {
+        const newDoc: Doctor = {
+          id: newAccount.id,
+          name: newAccount.name.startsWith('Dr.') ? newAccount.name : `Dr. ${newAccount.name}`,
+          degree: newAccount.doctorDegree || 'MBBS, DO, Consultant Optometry',
+          specialty: newAccount.doctorSpecialty || 'Comprehensive Ophthalmology & Refraction',
+          experienceYears: 5,
+          room: newAccount.doctorRoom || 'Room 103 (Clinical OPD)',
+          shift: newAccount.doctorShift || 'Morning',
+          image: 'https://images.unsplash.com/photo-1594824813575-f860538a7c28?auto=format&fit=crop&w=600&q=80',
+          rating: 4.8,
+          availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+          bio: 'Clinical optometrist & vision care specialist.'
+        };
+        setDoctors(prev => [...prev, newDoc]);
+      }
+    }
+
+    setCurrentUser(newAccount);
+    setCurrentRole(newAccount.role);
+    setIsAuthenticated(true);
+
+    if (newAccount.role === 'patient') {
+      setActiveView('patient-portal');
+    } else if (newAccount.role === 'doctor') {
+      setActiveView('doctor-portal');
+    } else if (newAccount.role === 'admin') {
+      setActiveView('admin-panel');
+    }
+
+    showToast('success', 'Account Registered!', `Account created! Your Login ID is "${newAccount.loginId}".`);
+    return { success: true, message: `Account created successfully! Your Login ID is ${newAccount.loginId}`, account: newAccount };
+  };
+
+  // Admin action: Create new user with Login ID & Password
+  const adminCreateAccount = (
+    accountData: Omit<UserAccount, 'id' | 'dateCreated'>
+  ): { success: boolean; message: string; account?: UserAccount } => {
+    const cleanId = accountData.loginId.trim().toLowerCase();
+    const exists = accounts.some(a => a.loginId.toLowerCase() === cleanId);
+    if (exists) {
+      return { success: false, message: `Login ID "${accountData.loginId}" already exists.` };
+    }
+
+    const newAccount: UserAccount = {
+      ...accountData,
+      id: `${accountData.role}-${Date.now().toString().slice(-6)}`,
+      loginId: accountData.loginId.trim(),
+      dateCreated: new Date().toISOString().split('T')[0]
+    };
+
+    setAccounts(prev => [newAccount, ...prev]);
+
+    if (newAccount.role === 'doctor') {
+      const newDoc: Doctor = {
+        id: newAccount.id,
+        name: newAccount.name.startsWith('Dr.') ? newAccount.name : `Dr. ${newAccount.name}`,
+        degree: newAccount.doctorDegree || 'MBBS, DO, Consultant Optometry',
+        specialty: newAccount.doctorSpecialty || 'Clinical Specialist',
+        experienceYears: 6,
+        room: newAccount.doctorRoom || 'Room 106',
+        shift: newAccount.doctorShift || 'Morning',
+        image: 'https://images.unsplash.com/photo-1594824813575-f860538a7c28?auto=format&fit=crop&w=600&q=80',
+        rating: 4.8,
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        bio: 'Hospital appointed clinical staff.'
+      };
+      setDoctors(prev => [...prev, newDoc]);
+    }
+
+    showToast('success', 'Account Created', `Created ${newAccount.role} Login ID: "${newAccount.loginId}" with password.`);
+    return { success: true, message: `Created credentials for ${newAccount.name}`, account: newAccount };
+  };
+
+  const adminDeleteAccount = (accountId: string) => {
+    if (accounts.length <= 1) {
+      showToast('error', 'Cannot Delete', 'At least one account must remain in the system.');
+      return;
+    }
+    setAccounts(prev => prev.filter(a => a.id !== accountId));
+    showToast('info', 'Account Removed', 'User login credentials deleted.');
+  };
+
+  const resetPassword = (accountId: string, newPass: string) => {
+    setAccounts(prev => prev.map(a => a.id === accountId ? { ...a, password: newPass } : a));
+    if (currentUser.id === accountId) {
+      setCurrentUser(prev => ({ ...prev, password: newPass }));
+    }
+    showToast('success', 'Password Updated', 'Password successfully changed and saved.');
+  };
+
+  const updateProfile = (accountId: string, updates: Partial<UserAccount>) => {
+    setAccounts(prev => prev.map(a => a.id === accountId ? { ...a, ...updates } : a));
+    if (currentUser.id === accountId) {
+      setCurrentUser(prev => ({ ...prev, ...updates }));
+    }
+    showToast('success', 'Profile Updated', 'Account details have been refreshed.');
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setActiveView('home');
+    showToast('info', 'Signed Out', 'You have been logged out.');
+  };
+
   // Role switching
   const switchRole = (role: Role) => {
     setCurrentRole(role);
+    setIsAuthenticated(true);
+    const match = accounts.find(a => a.role === role);
+    if (match) {
+      setCurrentUser(match);
+    }
     if (role === 'patient') {
-      setCurrentUser(DEMO_PATIENT);
       setActiveView('patient-portal');
-      showToast('info', 'Switched to Patient View', 'Now viewing as Patient: Aditya Sharma');
+      showToast('info', 'Patient Dashboard', `Switched to Patient: ${match?.name || 'Patient'}`);
     } else if (role === 'doctor') {
-      setCurrentUser(DEMO_DOCTOR);
       setActiveView('doctor-portal');
-      showToast('info', 'Switched to Doctor Portal', 'Logged in as Dr. Abishek Raut (Refractive Specialist)');
+      showToast('info', 'Doctor Dashboard', `Switched to Doctor: ${match?.name || 'Doctor'}`);
     } else if (role === 'admin') {
-      setCurrentUser(DEMO_ADMIN);
       setActiveView('admin-panel');
-      showToast('info', 'Switched to Admin Dashboard', 'Full clinic operations & inventory access enabled');
+      showToast('info', 'Admin Dashboard', `Switched to Admin: ${match?.name || 'Admin'}`);
     }
   };
 
@@ -511,6 +719,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         currentUser,
         currentRole,
+        isAuthenticated,
+        accounts,
+        login,
+        registerAccount,
+        logout,
+        adminCreateAccount,
+        adminDeleteAccount,
+        resetPassword,
+        updateProfile,
         switchRole,
         doctors,
         addDoctor,

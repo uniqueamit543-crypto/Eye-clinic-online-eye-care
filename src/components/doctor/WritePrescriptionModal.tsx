@@ -75,7 +75,7 @@ export const WritePrescriptionModal: React.FC = () => {
       patientId: apt.patientId,
       patientName: apt.patientName,
       doctorId: currentUser.id || 'doc-1',
-      doctorName: currentUser.name || 'Dr. Shalini Sengupta',
+      doctorName: currentUser.name || 'Dr. Abishek Raut',
       doctorDegree: 'MBBS, MS (Ophthalmology), FICO',
       date: today,
       validUntil,

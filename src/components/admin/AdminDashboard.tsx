@@ -15,15 +15,31 @@ import {
   Edit2,
   Trash2,
   Eye,
+  EyeOff,
   Layers,
   ArrowUpRight,
   PackageCheck,
-  FileText
+  FileText,
+  KeyRound,
+  UserPlus,
+  Lock,
+  RefreshCw,
+  LogIn,
+  Search,
+  Check,
+  Info
 } from 'lucide-react';
-import { AppointmentStatus, OrderStatus, Doctor, Product, ShiftType } from '../../types';
+import { AppointmentStatus, OrderStatus, Doctor, Product, ShiftType, UserAccount, Role } from '../../types';
 
 export const AdminDashboard: React.FC = () => {
   const {
+    currentUser,
+    accounts,
+    adminCreateAccount,
+    adminDeleteAccount,
+    resetPassword,
+    switchRole,
+    showToast,
     appointments,
     updateAppointmentStatus,
     assignDoctorToAppointment,
@@ -39,9 +55,30 @@ export const AdminDashboard: React.FC = () => {
     moderateReview
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'appointments' | 'inventory' | 'orders' | 'doctors' | 'reviews'>('appointments');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'appointments' | 'inventory' | 'orders' | 'doctors' | 'reviews'>('accounts');
   const [shiftFilter, setShiftFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Accounts Management state
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [newAccRole, setNewAccRole] = useState<Role>('patient');
+  const [newAccLoginId, setNewAccLoginId] = useState('');
+  const [newAccPassword, setNewAccPassword] = useState('');
+  const [showNewAccPassword, setShowNewAccPassword] = useState(false);
+  const [newAccName, setNewAccName] = useState('');
+  const [newAccEmail, setNewAccEmail] = useState('');
+  const [newAccPhone, setNewAccPhone] = useState('');
+  const [newAccSpecialty, setNewAccSpecialty] = useState('Senior Optometrist');
+  const [newAccDegree, setNewAccDegree] = useState('MBBS, MS (Ophthalmology)');
+  const [newAccRoom, setNewAccRoom] = useState('Room 106');
+  const [newAccShift, setNewAccShift] = useState<ShiftType>('Morning');
+  const [newAccAge, setNewAccAge] = useState<number>(30);
+  const [newAccGender, setNewAccGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [accSearchQuery, setAccSearchQuery] = useState('');
+  const [accRoleFilter, setAccRoleFilter] = useState<string>('all');
+  const [visiblePasswords, setVisiblePasswords] = useState<{ [id: string]: boolean }>({});
+  const [resetModalAccount, setResetModalAccount] = useState<UserAccount | null>(null);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
 
   // New Doctor form toggle
   const [showAddDoctor, setShowAddDoctor] = useState(false);
@@ -118,6 +155,65 @@ export const AdminDashboard: React.FC = () => {
     setShowAddProduct(false);
   };
 
+  const handleAutoGenerateLoginId = () => {
+    const prefix = newAccRole === 'doctor' ? 'doc' : newAccRole === 'admin' ? 'admin' : 'pat';
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    setNewAccLoginId(`${prefix}_${rand}`);
+  };
+
+  const handleAdminCreateAccountSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAccLoginId.trim() || !newAccPassword.trim() || !newAccName.trim()) {
+      showToast('error', 'Missing Required Fields', 'Login ID, Password, and Full Name are required.');
+      return;
+    }
+
+    const res = adminCreateAccount({
+      loginId: newAccLoginId.trim(),
+      password: newAccPassword.trim(),
+      name: newAccName.trim(),
+      email: newAccEmail.trim() || `${newAccLoginId.toLowerCase()}@eyeclinic.org`,
+      phone: newAccPhone.trim() || '+91 98000 00000',
+      role: newAccRole,
+      doctorSpecialty: newAccRole === 'doctor' ? newAccSpecialty : undefined,
+      doctorDegree: newAccRole === 'doctor' ? newAccDegree : undefined,
+      doctorRoom: newAccRole === 'doctor' ? newAccRoom : undefined,
+      doctorShift: newAccRole === 'doctor' ? newAccShift : undefined,
+      patientAge: newAccRole === 'patient' ? newAccAge : undefined,
+      patientGender: newAccRole === 'patient' ? newAccGender : undefined
+    });
+
+    if (res.success) {
+      setShowCreateAccount(false);
+      setNewAccLoginId('');
+      setNewAccPassword('');
+      setNewAccName('');
+      setNewAccEmail('');
+      setNewAccPhone('');
+    }
+  };
+
+  const handleResetPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetModalAccount || !newPasswordVal.trim()) return;
+    resetPassword(resetModalAccount.id, newPasswordVal.trim());
+    setResetModalAccount(null);
+    setNewPasswordVal('');
+  };
+
+  const togglePasswordVisibility = (id: string) => {
+    setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const filteredAccounts = accounts.filter(acc => {
+    const matchesSearch =
+      acc.loginId.toLowerCase().includes(accSearchQuery.toLowerCase()) ||
+      acc.name.toLowerCase().includes(accSearchQuery.toLowerCase()) ||
+      acc.email.toLowerCase().includes(accSearchQuery.toLowerCase());
+    const matchesRole = accRoleFilter === 'all' || acc.role === accRoleFilter;
+    return matchesSearch && matchesRole;
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Admin Operations Top Bar */}
@@ -132,13 +228,18 @@ export const AdminDashboard: React.FC = () => {
               EyeClinic Central Management System
             </h1>
             <p className="text-xs text-indigo-200 mt-1">
-              Real-time monitoring of slot availability, doctor rotas, optical glazing queue, and customer feedback.
+              Real-time monitoring of user credentials, appointments, doctor rotas, optical glazing queue, and customer feedback.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs px-3 py-1.5 rounded-xl bg-white/10 text-slate-200 font-mono">
-              System: Online (Node.js/MySQL Tier)
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="px-3.5 py-2 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-xs text-indigo-200 flex items-center gap-2">
+              <KeyRound className="w-3.5 h-3.5 text-indigo-300" />
+              <span>Admin Login ID:</span>
+              <span className="font-mono font-bold text-white">@{currentUser?.loginId || 'admin_master'}</span>
+            </div>
+            <span className="text-xs px-3 py-2 rounded-xl bg-white/10 text-slate-200 font-mono">
+              System: Online
             </span>
           </div>
         </div>
@@ -154,11 +255,11 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-            <span className="text-xs text-slate-400 block">Pending Slot Approvals</span>
-            <span className="text-2xl font-bold font-mono text-amber-400">
-              {pendingAppointments}
+            <span className="text-xs text-slate-400 block">Registered Login IDs</span>
+            <span className="text-2xl font-bold font-mono text-indigo-300">
+              {accounts.length}
             </span>
-            <span className="text-[10px] text-slate-400 block mt-1">Requires doctor allocation</span>
+            <span className="text-[10px] text-slate-400 block mt-1">Patients, doctors & staff</span>
           </div>
 
           <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
@@ -182,6 +283,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 overflow-x-auto p-1.5 bg-slate-100 rounded-2xl">
         {[
+          { id: 'accounts', label: `Login IDs & Credentials (${accounts.length})`, icon: <KeyRound className="w-4 h-4 text-indigo-600" /> },
           { id: 'appointments', label: `Appointments (${appointments.length})`, icon: <Calendar className="w-4 h-4" /> },
           { id: 'inventory', label: `Glasses Inventory (${products.length})`, icon: <ShoppingBag className="w-4 h-4" /> },
           { id: 'orders', label: `Orders & Glazing (${orders.length})`, icon: <PackageCheck className="w-4 h-4" /> },
@@ -202,6 +304,402 @@ export const AdminDashboard: React.FC = () => {
           </button>
         ))}
       </div>
+
+      {/* TAB 0: User Accounts & Login Credentials Management */}
+      {activeTab === 'accounts' && (
+        <div className="space-y-6">
+          {/* Controls Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-1 items-center gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={accSearchQuery}
+                  onChange={e => setAccSearchQuery(e.target.value)}
+                  placeholder="Search by Login ID, Name, or Email..."
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <select
+                value={accRoleFilter}
+                onChange={e => setAccRoleFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-slate-50/50 focus:bg-white cursor-pointer"
+              >
+                <option value="all">All Roles ({accounts.length})</option>
+                <option value="patient">Patients ({accounts.filter(a => a.role === 'patient').length})</option>
+                <option value="doctor">Doctors ({accounts.filter(a => a.role === 'doctor').length})</option>
+                <option value="admin">Admins ({accounts.filter(a => a.role === 'admin').length})</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowCreateAccount(!showCreateAccount);
+                if (!newAccLoginId) {
+                  const prefix = newAccRole === 'doctor' ? 'doc' : newAccRole === 'admin' ? 'admin' : 'pat';
+                  setNewAccLoginId(`${prefix}_${Math.floor(1000 + Math.random() * 9000)}`);
+                }
+              }}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{showCreateAccount ? 'Close Form' : 'Create Login ID & Password'}</span>
+            </button>
+          </div>
+
+          {/* Create New Account Form Card */}
+          {showCreateAccount && (
+            <div className="bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 rounded-2xl border border-indigo-200 p-6 shadow-sm animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between pb-4 border-b border-indigo-100 mb-5">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 font-heading flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-indigo-600" />
+                    <span>Create User Login Credentials</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Generate and provision credentials with direct role access for Patients, Doctors, or Administrators.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateAccount(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleAdminCreateAccountSubmit} className="space-y-4">
+                {/* Role Selector */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-2">Assign Role *</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['patient', 'doctor', 'admin'] as Role[]).map(r => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => {
+                          setNewAccRole(r);
+                          const prefix = r === 'doctor' ? 'doc' : r === 'admin' ? 'admin' : 'pat';
+                          setNewAccLoginId(`${prefix}_${Math.floor(1000 + Math.random() * 9000)}`);
+                        }}
+                        className={`p-2.5 rounded-xl border text-center text-xs font-bold capitalize transition cursor-pointer ${
+                          newAccRole === r
+                            ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Login ID and Password */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-700">Login ID / Username *</label>
+                      <button
+                        type="button"
+                        onClick={handleAutoGenerateLoginId}
+                        className="text-[11px] text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Auto-Generate
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={newAccLoginId}
+                      onChange={e => setNewAccLoginId(e.target.value)}
+                      placeholder="e.g. doc_sharma or pat_8821"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Set Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showNewAccPassword ? 'text' : 'password'}
+                        value={newAccPassword}
+                        onChange={e => setNewAccPassword(e.target.value)}
+                        placeholder="Choose initial password"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewAccPassword(!showNewAccPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showNewAccPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Name & Contact */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      value={newAccName}
+                      onChange={e => setNewAccName(e.target.value)}
+                      placeholder={newAccRole === 'doctor' ? 'Dr. Name' : 'Full Name'}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={newAccEmail}
+                      onChange={e => setNewAccEmail(e.target.value)}
+                      placeholder="user@example.com"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={newAccPhone}
+                      onChange={e => setNewAccPhone(e.target.value)}
+                      placeholder="+91 98000 00000"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Role Specific Additional Fields */}
+                {newAccRole === 'doctor' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 bg-sky-50 rounded-xl border border-sky-100">
+                    <div>
+                      <label className="block text-[11px] font-medium text-sky-900 mb-1">Qualifications</label>
+                      <input
+                        type="text"
+                        value={newAccDegree}
+                        onChange={e => setNewAccDegree(e.target.value)}
+                        placeholder="MBBS, MS"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-sky-200 bg-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-sky-900 mb-1">Specialty</label>
+                      <input
+                        type="text"
+                        value={newAccSpecialty}
+                        onChange={e => setNewAccSpecialty(e.target.value)}
+                        placeholder="Specialty"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-sky-200 bg-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-sky-900 mb-1">Room</label>
+                      <input
+                        type="text"
+                        value={newAccRoom}
+                        onChange={e => setNewAccRoom(e.target.value)}
+                        placeholder="Room 106"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-sky-200 bg-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-sky-900 mb-1">Shift</label>
+                      <select
+                        value={newAccShift}
+                        onChange={e => setNewAccShift(e.target.value as ShiftType)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-sky-200 bg-white text-xs"
+                      >
+                        <option value="Morning">Morning</option>
+                        <option value="Afternoon">Afternoon</option>
+                        <option value="Evening">Evening</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit button */}
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateAccount(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 cursor-pointer"
+                  >
+                    Save Credentials & Issue Login ID
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Accounts Directory Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">System Login Credentials Registry</h3>
+                <p className="text-[11px] text-slate-500">
+                  Showing {filteredAccounts.length} of {accounts.length} active accounts.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3.5">Login ID</th>
+                    <th className="p-3.5">Role</th>
+                    <th className="p-3.5">User Details</th>
+                    <th className="p-3.5">Password</th>
+                    <th className="p-3.5">Date Created</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredAccounts.map(acc => {
+                    const isVisible = visiblePasswords[acc.id];
+                    return (
+                      <tr key={acc.id} className="hover:bg-slate-50/70 transition">
+                        <td className="p-3.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-mono font-bold text-slate-900">
+                            @{acc.loginId}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            acc.role === 'patient'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : acc.role === 'doctor'
+                              ? 'bg-sky-100 text-sky-800 border border-sky-200'
+                              : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          }`}>
+                            {acc.role}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          <div className="font-bold text-slate-900">{acc.name}</div>
+                          <div className="text-[11px] text-slate-500">{acc.email} • {acc.phone}</div>
+                          {acc.doctorSpecialty && (
+                            <div className="text-[10px] text-sky-700">{acc.doctorSpecialty} ({acc.doctorRoom})</div>
+                          )}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="inline-flex items-center gap-2 font-mono text-slate-700 bg-slate-50 px-2 py-1 rounded border border-slate-200">
+                            <span>{isVisible ? acc.password : '••••••••'}</span>
+                            <button
+                              type="button"
+                              onClick={() => togglePasswordVisibility(acc.id)}
+                              className="text-slate-400 hover:text-slate-700"
+                              title={isVisible ? 'Hide password' : 'Show password'}
+                            >
+                              {isVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-slate-500 font-mono">
+                          {acc.dateCreated}
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setResetModalAccount(acc);
+                                setNewPasswordVal(acc.password);
+                              }}
+                              title="Reset Password"
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 border border-amber-200 transition cursor-pointer"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => switchRole(acc.role)}
+                              title={`Switch to ${acc.role} Dashboard`}
+                              className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 border border-indigo-200 transition cursor-pointer"
+                            >
+                              <LogIn className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => adminDeleteAccount(acc.id)}
+                              title="Delete Account"
+                              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 border border-rose-200 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Reset Password Dialog */}
+          {resetModalAccount && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+              <form onSubmit={handleResetPasswordSubmit} className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-slate-900 text-sm font-heading flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-indigo-600" />
+                    <span>Reset Password</span>
+                  </h3>
+                  <button type="button" onClick={() => setResetModalAccount(null)} className="text-slate-400 hover:text-slate-700">
+                    ✕
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-600">
+                  Updating password for <strong className="font-mono text-indigo-700">@{resetModalAccount.loginId}</strong> ({resetModalAccount.name}).
+                </p>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">New Password</label>
+                  <input
+                    type="text"
+                    value={newPasswordVal}
+                    onChange={e => setNewPasswordVal(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetModalAccount(null)}
+                    className="px-4 py-2 text-xs text-slate-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl cursor-pointer"
+                  >
+                    Save New Password
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* TAB 1: Appointments Management */}
       {activeTab === 'appointments' && (

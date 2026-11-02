@@ -12,7 +12,9 @@ import {
   Eye,
   Filter,
   Search,
-  ExternalLink
+  ExternalLink,
+  KeyRound,
+  Lock
 } from 'lucide-react';
 import { Appointment, Prescription } from '../../types';
 
@@ -24,12 +26,15 @@ export const DoctorDashboard: React.FC = () => {
     prescriptions,
     setActiveModal,
     setSelectedAppointmentForRx,
-    doctors
+    doctors,
+    resetPassword
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'queue' | 'prescriptions'>('queue');
   const [filterShift, setFilterShift] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
 
   // Find active doctor details
   const activeDoctor = doctors.find(d => d.id === currentUser.id) || doctors[0];

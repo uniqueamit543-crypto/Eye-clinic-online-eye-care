@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   X,
@@ -10,348 +10,583 @@ import {
   ArrowRight,
   CheckCircle2,
   KeyRound,
-  RotateCcw
+  Stethoscope,
+  Eye,
+  EyeOff,
+  Sparkles,
+  RefreshCw,
+  Info
 } from 'lucide-react';
-import { Role } from '../../types';
+import { Role, ShiftType } from '../../types';
 
 export const AuthModal: React.FC = () => {
-  const { activeModal, setActiveModal, switchRole, showToast } = useApp();
+  const {
+    activeModal,
+    setActiveModal,
+    login,
+    registerAccount,
+    accounts,
+    showToast
+  } = useApp();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [selectedRole, setSelectedRole] = useState<Role>('patient');
-  const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
 
-  // Form states
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
-  const [resendTimer, setResendTimer] = useState(45);
-  const [generatedDemoOtp, setGeneratedDemoOtp] = useState('749281');
+  // Login form state
+  const [loginId, setLoginId] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (step === 'otp' && resendTimer > 0) {
-      timer = setInterval(() => {
-        setResendTimer(prev => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [step, resendTimer]);
+  // Register form state
+  const [regLoginId, setRegLoginId] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [regFullName, setRegFullName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regAge, setRegAge] = useState<number>(28);
+  const [regGender, setRegGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [regSpecialty, setRegSpecialty] = useState('Senior Optometrist & Contact Lens');
+  const [regDegree, setRegDegree] = useState('B.Optom, M.Optom');
+  const [regRoom, setRegRoom] = useState('Room 103 (Clinical OPD)');
+  const [regShift, setRegShift] = useState<ShiftType>('Morning');
+  const [regError, setRegError] = useState('');
 
   if (activeModal !== 'auth') return null;
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  // Auto-generate Login ID helper
+  const handleGenerateLoginId = () => {
+    const prefix = selectedRole === 'doctor' ? 'doc' : selectedRole === 'admin' ? 'admin' : 'pat';
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const generated = `${prefix}_${rand}`;
+    setRegLoginId(generated);
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone && !email) {
-      showToast('error', 'Required Field', 'Please enter your phone number or email.');
+    setLoginError('');
+
+    if (!loginId.trim()) {
+      setLoginError('Please enter your Login ID or registered Email.');
       return;
     }
-    // Generate a new 6 digit OTP
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedDemoOtp(code);
-    setResendTimer(45);
-    setStep('otp');
-    showToast(
-      'info',
-      'OTP Sent (2FA Simulation)',
-      `Security Code ${code} dispatched to ${phone || email} as per RFC 4226 standards.`
-    );
-  };
-
-  const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) {
-      // Handle paste
-      const pasted = val.slice(0, 6).split('');
-      const newOtp = [...otpCode];
-      pasted.forEach((char, i) => {
-        newOtp[i] = char;
-      });
-      setOtpCode(newOtp);
+    if (!loginPassword) {
+      setLoginError('Please enter your password.');
       return;
     }
-    const newOtp = [...otpCode];
-    newOtp[index] = val;
-    setOtpCode(newOtp);
 
-    // Auto-focus next input
-    if (val && index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      nextInput?.focus();
+    const res = login(loginId, loginPassword);
+    if (res.success) {
+      setActiveModal(null);
+      setLoginId('');
+      setLoginPassword('');
+    } else {
+      setLoginError(res.message);
     }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const entered = otpCode.join('');
-    if (entered.length < 6) {
-      showToast('warning', 'Incomplete OTP', 'Please enter all 6 digits of the OTP.');
+    setRegError('');
+
+    if (!regLoginId.trim()) {
+      setRegError('Please choose or generate a Login ID.');
+      return;
+    }
+    if (!regPassword || regPassword.length < 4) {
+      setRegError('Password must be at least 4 characters long.');
+      return;
+    }
+    if (!regFullName.trim()) {
+      setRegError('Full Name is required.');
       return;
     }
 
-    // Success
-    showToast('success', 'Identity Verified', `Welcome! Authentication successful as ${selectedRole}.`);
-    switchRole(selectedRole);
-    setActiveModal(null);
-    setStep('credentials');
-    setOtpCode(['', '', '', '', '', '']);
+    const res = registerAccount({
+      loginId: regLoginId.trim(),
+      password: regPassword,
+      name: regFullName.trim(),
+      email: regEmail.trim() || `${regLoginId.toLowerCase()}@eyeclinic.org`,
+      phone: regPhone.trim() || '+91 98000 00000',
+      role: selectedRole,
+      patientAge: selectedRole === 'patient' ? regAge : undefined,
+      patientGender: selectedRole === 'patient' ? regGender : undefined,
+      doctorSpecialty: selectedRole === 'doctor' ? regSpecialty : undefined,
+      doctorDegree: selectedRole === 'doctor' ? regDegree : undefined,
+      doctorRoom: selectedRole === 'doctor' ? regRoom : undefined,
+      doctorShift: selectedRole === 'doctor' ? regShift : undefined
+    });
+
+    if (res.success) {
+      setActiveModal(null);
+      setRegLoginId('');
+      setRegPassword('');
+      setRegFullName('');
+      setRegEmail('');
+      setRegPhone('');
+    } else {
+      setRegError(res.message);
+    }
   };
 
-  const handleQuickDemoLogin = (role: Role) => {
-    switchRole(role);
-    setActiveModal(null);
+  const handleQuickLogin = (demoLoginId: string, demoPass: string) => {
+    setLoginId(demoLoginId);
+    setLoginPassword(demoPass);
+    const res = login(demoLoginId, demoPass);
+    if (res.success) {
+      setActiveModal(null);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
-        {/* Header decoration */}
-        <div className="bg-gradient-to-r from-teal-600 via-teal-700 to-cyan-700 p-6 text-white text-center relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div
+        className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden relative"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Top Header */}
+        <div className="p-6 pb-4 bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white relative">
           <button
             onClick={() => setActiveModal(null)}
-            className="absolute top-4 right-4 p-1.5 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="absolute top-5 right-5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md mb-2 text-white">
-            <KeyRound className="w-6 h-6" />
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-xs font-semibold border border-teal-400/30 flex items-center gap-1">
+              <KeyRound className="w-3.5 h-3.5" />
+              Role-Based Access Control
+            </span>
           </div>
-          <h3 className="text-xl font-bold font-heading">
-            {step === 'otp' ? 'Enter 2-Factor OTP' : mode === 'login' ? 'Secure Clinic Portal' : 'Patient Registration'}
-          </h3>
-          <p className="text-xs text-teal-100 mt-1">
-            {step === 'otp'
-              ? `Verification code dispatched to your registered device`
-              : 'Role-based access with OTP verification & bcrypt security'}
+
+          <h2 className="text-2xl font-bold font-heading">
+            {mode === 'login' ? 'Sign In to Your Dashboard' : 'Create Login ID & Password'}
+          </h2>
+          <p className="text-xs text-teal-200/80 mt-1">
+            {mode === 'login'
+              ? 'Access your Patient, Doctor, or Clinic Admin portal with your credentials.'
+              : 'Register your personal Login ID and password for instant access to your dedicated portal.'}
           </p>
+
+          {/* Mode Switch Tabs */}
+          <div className="flex mt-4 bg-black/20 p-1 rounded-xl">
+            <button
+              onClick={() => {
+                setMode('login');
+                setLoginError('');
+              }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${
+                mode === 'login'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-white/80 hover:text-white'
+              }`}
+            >
+              Sign In (Existing User)
+            </button>
+            <button
+              onClick={() => {
+                setMode('register');
+                setRegError('');
+                if (!regLoginId) handleGenerateLoginId();
+              }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${
+                mode === 'register'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-white/80 hover:text-white'
+              }`}
+            >
+              Create Account (New Login ID)
+            </button>
+          </div>
         </div>
 
-        <div className="p-6">
-          {/* Role selector buttons */}
-          {step === 'credentials' && (
-            <div className="mb-5">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                Select Your Role
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['patient', 'doctor', 'admin'] as Role[]).map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setSelectedRole(r)}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold capitalize border transition cursor-pointer flex flex-col items-center gap-1 ${
-                      selectedRole === r
-                        ? 'bg-teal-50 border-teal-500 text-teal-800 ring-2 ring-teal-500/20'
-                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {r === 'patient' && <User className="w-4 h-4 text-teal-600" />}
-                    {r === 'doctor' && <ShieldCheck className="w-4 h-4 text-sky-600" />}
-                    {r === 'admin' && <Lock className="w-4 h-4 text-indigo-600" />}
-                    <span>{r}</span>
-                  </button>
-                ))}
-              </div>
+        {/* Modal Scrollable Body */}
+        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+          {/* Role Picker */}
+          <div>
+            <label className="block text-xs font-semibold uppercase text-slate-500 tracking-wider mb-2">
+              Select Your Role / Perspective
+            </label>
+            <div className="grid grid-cols-3 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('patient');
+                  if (mode === 'register' && !regLoginId.startsWith('pat_')) {
+                    setRegLoginId(`pat_${Math.floor(1000 + Math.random() * 9000)}`);
+                  }
+                }}
+                className={`p-3 rounded-2xl border text-left transition flex flex-col items-start gap-1 cursor-pointer ${
+                  selectedRole === 'patient'
+                    ? 'border-teal-500 bg-teal-50/70 text-teal-900 shadow-xs ring-2 ring-teal-500/20'
+                    : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-slate-50/50'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg ${selectedRole === 'patient' ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  <User className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold">Patient</div>
+                  <div className="text-[10px] text-slate-500">Rx, slots, orders</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('doctor');
+                  if (mode === 'register' && !regLoginId.startsWith('doc_')) {
+                    setRegLoginId(`doc_${Math.floor(100 + Math.random() * 900)}`);
+                  }
+                }}
+                className={`p-3 rounded-2xl border text-left transition flex flex-col items-start gap-1 cursor-pointer ${
+                  selectedRole === 'doctor'
+                    ? 'border-sky-500 bg-sky-50/70 text-sky-900 shadow-xs ring-2 ring-sky-500/20'
+                    : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-slate-50/50'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg ${selectedRole === 'doctor' ? 'bg-sky-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  <Stethoscope className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold">Doctor</div>
+                  <div className="text-[10px] text-slate-500">OPD queue, write Rx</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole('admin');
+                  if (mode === 'register' && !regLoginId.startsWith('admin_')) {
+                    setRegLoginId(`admin_${Math.floor(100 + Math.random() * 900)}`);
+                  }
+                }}
+                className={`p-3 rounded-2xl border text-left transition flex flex-col items-start gap-1 cursor-pointer ${
+                  selectedRole === 'admin'
+                    ? 'border-indigo-500 bg-indigo-50/70 text-indigo-900 shadow-xs ring-2 ring-indigo-500/20'
+                    : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-slate-50/50'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg ${selectedRole === 'admin' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold">Admin</div>
+                  <div className="text-[10px] text-slate-500">Stock & users</div>
+                </div>
+              </button>
             </div>
+          </div>
+
+          {/* MODE: LOGIN */}
+          {mode === 'login' && (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {loginError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <Info className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              {/* Login ID input */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Login ID or Email
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={loginId}
+                    onChange={e => setLoginId(e.target.value)}
+                    placeholder="e.g. patient_aditya, doc_abishek, admin_master"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password input */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">Password</label>
+                  <span className="text-[11px] text-teal-600 font-medium">Standard or Created Password</span>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    value={loginPassword}
+                    onChange={e => setLoginPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit CTA */}
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-semibold text-sm shadow-md shadow-teal-500/20 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Sign In to {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} Dashboard</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              {/* One-click quick login credentials helper */}
+              <div className="pt-3 border-t border-slate-100">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                  Quick One-Click Demo Credentials:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('patient_aditya', 'patient123')}
+                    className="p-2.5 rounded-xl bg-slate-50 hover:bg-teal-50/80 border border-slate-200 hover:border-teal-300 text-left transition group cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-teal-900 group-hover:text-teal-700">Patient Demo</div>
+                    <div className="text-[10px] text-slate-500 font-mono">ID: patient_aditya</div>
+                    <div className="text-[10px] text-slate-400 font-mono">Pass: patient123</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('doc_abishek', 'doctor123')}
+                    className="p-2.5 rounded-xl bg-slate-50 hover:bg-sky-50/80 border border-slate-200 hover:border-sky-300 text-left transition group cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-sky-900 group-hover:text-sky-700">Doctor Demo</div>
+                    <div className="text-[10px] text-slate-500 font-mono">ID: doc_abishek</div>
+                    <div className="text-[10px] text-slate-400 font-mono">Pass: doctor123</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('admin_master', 'admin123')}
+                    className="p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/80 border border-slate-200 hover:border-indigo-300 text-left transition group cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-indigo-900 group-hover:text-indigo-700">Admin Demo</div>
+                    <div className="text-[10px] text-slate-500 font-mono">ID: admin_master</div>
+                    <div className="text-[10px] text-slate-400 font-mono">Pass: admin123</div>
+                  </button>
+                </div>
+              </div>
+            </form>
           )}
 
-          {step === 'credentials' ? (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              {mode === 'register' && (
+          {/* MODE: REGISTER / CREATE LOGIN ID & PASSWORD */}
+          {mode === 'register' && (
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              {regError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <Info className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{regError}</span>
+                </div>
+              )}
+
+              {/* Login ID with Generate Button */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Create Login ID / Username *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateLoginId}
+                    className="text-[11px] text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Auto-Generate ID
+                  </button>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    value={regLoginId}
+                    onChange={e => setRegLoginId(e.target.value)}
+                    placeholder="e.g. rahul_sharma or pat_7491"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                    required
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">This Login ID will be used every time you sign in.</p>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Create Password * (min 4 characters)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showRegPassword ? 'text' : 'password'}
+                    value={regPassword}
+                    onChange={e => setRegPassword(e.target.value)}
+                    placeholder="Set your password"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  value={regFullName}
+                  onChange={e => setRegFullName(e.target.value)}
+                  placeholder={selectedRole === 'doctor' ? 'e.g. Dr. Ramesh Gupta' : 'e.g. Ramesh Gupta'}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                  required
+                />
+              </div>
+
+              {/* Contact Details (2 columns) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Full Legal Name</label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={regPhone}
+                    onChange={e => setRegPhone(e.target.value)}
+                    placeholder="+91 98765 00000"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={regEmail}
+                    onChange={e => setRegEmail(e.target.value)}
+                    placeholder="email@example.com"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Patient Specific Fields */}
+              {selectedRole === 'patient' && (
+                <div className="grid grid-cols-2 gap-3 p-3 bg-teal-50/50 rounded-2xl border border-teal-100">
+                  <div>
+                    <label className="block text-xs font-medium text-teal-900 mb-1">Age</label>
                     <input
-                      type="text"
-                      required
-                      placeholder="e.g. Aditya Sharma"
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-hidden"
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={regAge}
+                      onChange={e => setRegAge(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 rounded-lg border border-teal-200 bg-white text-sm"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-teal-900 mb-1">Gender</label>
+                    <select
+                      value={regGender}
+                      onChange={e => setRegGender(e.target.value as any)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-teal-200 bg-white text-sm"
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Email Address or Mobile Number
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="aditya.sharma@niu.edu.in"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-hidden"
-                  />
+              {/* Doctor Specific Fields */}
+              {selectedRole === 'doctor' && (
+                <div className="p-3 bg-sky-50/50 rounded-2xl border border-sky-100 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-sky-900 mb-1">Qualifications</label>
+                      <input
+                        type="text"
+                        value={regDegree}
+                        onChange={e => setRegDegree(e.target.value)}
+                        placeholder="MBBS, MS / B.Optom"
+                        className="w-full px-3 py-1.5 rounded-lg border border-sky-200 bg-white text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-sky-900 mb-1">OPD Shift</label>
+                      <select
+                        value={regShift}
+                        onChange={e => setRegShift(e.target.value as ShiftType)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-sky-200 bg-white text-sm"
+                      >
+                        <option value="Morning">Morning (09:00 - 12:00)</option>
+                        <option value="Afternoon">Afternoon (13:00 - 16:00)</option>
+                        <option value="Evening">Evening (17:00 - 20:00)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-sky-900 mb-1">Specialty</label>
+                      <input
+                        type="text"
+                        value={regSpecialty}
+                        onChange={e => setRegSpecialty(e.target.value)}
+                        placeholder="Refractive Specialist"
+                        className="w-full px-3 py-1.5 rounded-lg border border-sky-200 bg-white text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-sky-900 mb-1">Consultation Room</label>
+                      <input
+                        type="text"
+                        value={regRoom}
+                        onChange={e => setRegRoom(e.target.value)}
+                        placeholder="Room 103"
+                        className="w-full px-3 py-1.5 rounded-lg border border-sky-200 bg-white text-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Mobile (for OTP SMS)</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="tel"
-                    placeholder="+91 98765 43210"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-medium text-slate-700">Password</label>
-                  <a href="#forgot" onClick={(e) => { e.preventDefault(); showToast('info', 'Password Reset', 'Password recovery link sent.'); }} className="text-xs text-teal-600 hover:underline">
-                    Forgot?
-                  </a>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="password"
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-hidden"
-                  />
-                </div>
-              </div>
-
+              {/* Submit CTA */}
               <button
                 type="submit"
-                className="w-full mt-2 py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-md shadow-teal-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-semibold text-sm shadow-md shadow-teal-500/20 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Continue to OTP Verification</span>
+                <span>Create {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} Account & Log In</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              <div className="flex items-center justify-center gap-1 text-xs text-slate-600 pt-2">
-                <span>{mode === 'login' ? "Don't have an account?" : 'Already registered?'}</span>
-                <button
-                  type="button"
-                  onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                  className="text-teal-600 font-semibold hover:underline cursor-pointer"
-                >
-                  {mode === 'login' ? 'Sign Up' : 'Log In'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            /* OTP Verification Screen */
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="text-center">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-xs font-mono mb-3">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                  <span>Simulated OTP Code: <strong>{generatedDemoOtp}</strong></span>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Please enter the 6-digit code sent to your device.
-                </p>
-              </div>
-
-              {/* 6 Digit Inputs */}
-              <div className="flex justify-center gap-2 my-4">
-                {otpCode.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    id={`otp-input-${idx}`}
-                    type="text"
-                    maxLength={1}
-                    value={digit}
-                    onChange={e => handleOtpChange(idx, e.target.value)}
-                    className="w-11 h-12 text-center text-lg font-bold rounded-xl border border-slate-300 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-hidden bg-slate-50 focus:bg-white"
-                  />
-                ))}
-              </div>
-
-              {/* Auto-fill Helper */}
-              <button
-                type="button"
-                onClick={() => setOtpCode(generatedDemoOtp.split(''))}
-                className="w-full py-1.5 text-xs text-teal-600 hover:text-teal-700 font-medium underline underline-offset-2 cursor-pointer"
-              >
-                Auto-fill Code ({generatedDemoOtp})
-              </button>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-md shadow-teal-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Verify & Sign In</span>
-              </button>
-
-              <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep('credentials')}
-                  className="hover:text-slate-800 cursor-pointer"
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  disabled={resendTimer > 0}
-                  onClick={() => {
-                    const code = Math.floor(100000 + Math.random() * 900000).toString();
-                    setGeneratedDemoOtp(code);
-                    setResendTimer(45);
-                    showToast('info', 'New OTP Sent', `Code: ${code}`);
-                  }}
-                  className={`flex items-center gap-1 cursor-pointer ${
-                    resendTimer > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-teal-600 hover:underline'
-                  }`}
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Resend in {resendTimer > 0 ? `${resendTimer}s` : 'Now'}</span>
-                </button>
-              </div>
             </form>
           )}
-
-          {/* Quick Demo Switcher Section */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Evaluator Quick Access (1-Click Login)
-            </p>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('patient')}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 transition text-center cursor-pointer"
-              >
-                <span className="font-bold block">Patient</span>
-                <span className="text-[10px] text-slate-400 block">Aditya Sharma</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('doctor')}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-800 transition text-center cursor-pointer"
-              >
-                <span className="font-bold block">Doctor</span>
-                <span className="text-[10px] text-slate-400 block">Dr. Shalini Sengupta</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin('admin')}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-800 transition text-center cursor-pointer"
-              >
-                <span className="font-bold block">Admin</span>
-                <span className="text-[10px] text-slate-400 block">Chief Admin</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
