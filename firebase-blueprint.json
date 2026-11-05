@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered user profile and patient clinical account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["patient", "doctor", "admin"] },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Patient appointment booking for eye consultation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string", "maxLength": 100 },
+        "patientPhone": { "type": "string", "maxLength": 20 },
+        "patientEmail": { "type": "string", "maxLength": 100 },
+        "patientAge": { "type": "number" },
+        "patientGender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "date": { "type": "string" },
+        "timeSlot": { "type": "string" },
+        "shift": { "type": "string", "enum": ["Morning", "Afternoon", "Evening"] },
+        "doctorId": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "doctorSpecialty": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled", "in-progress"] },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["patientName", "patientPhone", "date", "timeSlot", "shift", "doctorId", "status"]
+    },
+    "Prescription": {
+      "title": "Prescription",
+      "description": "Doctor optical prescription for vision and glasses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "appointmentId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string", "maxLength": 100 },
+        "doctorId": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "date": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "pd": { "type": "number" },
+        "recommendedLens": { "type": "string" },
+        "clinicalAdvice": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["patientName", "doctorId", "date", "recommendedLens"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Prescription eyewear optical lab order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerEmail": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string", "maxLength": 20 },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "orderStatus": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["customerName", "customerPhone", "total", "paymentMethod", "orderStatus"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Patient feedback and rating for eye clinic services",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientName": { "type": "string", "maxLength": 100 },
+        "rating": { "type": "number" },
+        "service": { "type": "string" },
+        "comment": { "type": "string", "maxLength": 1000 },
+        "date": { "type": "string" },
+        "approved": { "type": "boolean" }
+      },
+      "required": ["patientName", "rating", "comment", "approved"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and clinical accounts"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Clinic appointments and time slots"
+    },
+    "/prescriptions/{prescriptionId}": {
+      "schema": { "$ref": "#/entities/Prescription" },
+      "description": "Digital eye prescriptions issued by doctors"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Optical lab orders and status tracking"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Patient reviews and testimonials"
+    }
+  }
+}

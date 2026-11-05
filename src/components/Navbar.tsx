@@ -10,10 +10,9 @@ import {
   ShieldCheck,
   Menu,
   X,
+  User as UserIcon,
   LogIn,
-  LogOut,
-  KeyRound,
-  User
+  LogOut
 } from 'lucide-react';
 import { Role } from '../types';
 
@@ -21,14 +20,14 @@ export const Navbar: React.FC = () => {
   const {
     currentRole,
     switchRole,
-    currentUser,
-    isAuthenticated,
-    logout,
     cartTotal,
     wishlist,
     setActiveModal,
     activeView,
-    setActiveView
+    setActiveView,
+    currentUser,
+    isAuthenticated,
+    signOutUser
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -163,50 +162,6 @@ export const Navbar: React.FC = () => {
 
           {/* Right Actions: Role Switcher Pill + Cart + Book CTA */}
           <div className="flex items-center gap-2.5">
-            {/* User Account / Login ID Chip */}
-            {isAuthenticated ? (
-              <div className="flex items-center gap-1.5 bg-slate-100/90 border border-slate-200 rounded-xl p-1 pr-2 shadow-2xs">
-                <button
-                  onClick={() => setActiveModal('auth')}
-                  title="Manage Login ID / Switch Account"
-                  className="flex items-center gap-2 cursor-pointer text-left group"
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-xs transition group-hover:scale-105 ${
-                    currentRole === 'patient'
-                      ? 'bg-emerald-600'
-                      : currentRole === 'doctor'
-                      ? 'bg-sky-600'
-                      : 'bg-indigo-600'
-                  }`}>
-                    {currentUser?.name?.charAt(0) || 'U'}
-                  </div>
-                  <div className="hidden xl:block leading-tight pr-1">
-                    <div className="text-xs font-semibold text-slate-800 truncate max-w-[110px]">
-                      {currentUser?.name}
-                    </div>
-                    <div className="text-[10px] text-teal-700 font-mono font-medium">
-                      @{currentUser?.loginId || 'user'}
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={logout}
-                  title="Sign Out"
-                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setActiveModal('auth')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Sign In / Register</span>
-              </button>
-            )}
 
             {/* Quick Interactive Role Switcher */}
             <div className="hidden sm:flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
@@ -258,6 +213,40 @@ export const Navbar: React.FC = () => {
                 </span>
               )}
             </button>
+
+            {/* User Auth / Profile Pill */}
+            {isAuthenticated ? (
+              <div className="flex items-center gap-1 bg-teal-50 border border-teal-200/80 rounded-xl px-2 py-1 text-xs">
+                <button
+                  onClick={() => {
+                    switchRole('patient');
+                    setActiveView('patient-portal');
+                  }}
+                  className="flex items-center gap-1.5 font-medium text-teal-900 hover:text-teal-950 px-1 py-0.5 rounded cursor-pointer"
+                  title="View My Profile & Records"
+                >
+                  <div className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-[11px]">
+                    {(currentUser?.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden xl:inline max-w-[100px] truncate font-semibold">{currentUser?.name || 'Account'}</span>
+                </button>
+                <button
+                  onClick={() => signOutUser()}
+                  className="p-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setActiveModal('user-auth')}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:border-teal-500 hover:bg-teal-50/50 text-slate-700 hover:text-teal-700 font-semibold text-xs transition cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5 text-teal-600" />
+                <span>Sign In</span>
+              </button>
+            )}
 
             {/* Quick Appointment CTA Button */}
             <button
@@ -376,11 +365,49 @@ export const Navbar: React.FC = () => {
                 setActiveModal('book-appointment');
                 setMobileMenuOpen(false);
               }}
-              className="w-full py-2.5 rounded-xl bg-teal-600 text-white font-medium text-center shadow-sm flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl bg-teal-600 text-white font-medium text-center shadow-sm flex items-center justify-center gap-2 cursor-pointer"
             >
               <Calendar className="w-4 h-4" />
               Book Appointment Now
             </button>
+
+            {/* Mobile Account Access */}
+            <div className="pt-2 border-t border-slate-200">
+              {isAuthenticated ? (
+                <div className="flex items-center justify-between p-2.5 bg-teal-50 rounded-xl border border-teal-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs">
+                      {(currentUser?.name || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{currentUser?.name}</p>
+                      <p className="text-[11px] text-slate-500">{currentUser?.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      signOutUser();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setActiveModal('user-auth');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-teal-600 bg-teal-50/70 hover:bg-teal-100 text-teal-800 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <LogIn className="w-4 h-4 text-teal-600" />
+                  <span>Sign In / Create Account</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

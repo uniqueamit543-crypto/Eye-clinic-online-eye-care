@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global deny-by-default safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Health-check / connection test document
+    match /test/{testId} {
+      allow get: if isValidId(testId);
+      allow list: if true;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if true;
+      allow create, update: if isValidId(userId)
+        && incoming().name is string && incoming().name.size() <= 100
+        && incoming().email is string && incoming().email.size() <= 100;
+    }
+
+    // Appointments Collection
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId);
+      allow list: if true;
+      allow create: if isValidId(appointmentId)
+        && incoming().patientName is string && incoming().patientName.size() <= 100
+        && incoming().patientPhone is string && incoming().patientPhone.size() <= 30
+        && incoming().date is string
+        && incoming().timeSlot is string
+        && incoming().shift in ['Morning', 'Afternoon', 'Evening']
+        && incoming().doctorId is string
+        && incoming().status in ['pending', 'confirmed', 'completed', 'cancelled', 'in-progress'];
+      allow update: if isValidId(appointmentId)
+        && incoming().status in ['pending', 'confirmed', 'completed', 'cancelled', 'in-progress'];
+    }
+
+    // Prescriptions Collection
+    match /prescriptions/{prescriptionId} {
+      allow get: if isValidId(prescriptionId);
+      allow list: if true;
+      allow create, update: if isValidId(prescriptionId)
+        && incoming().patientName is string && incoming().patientName.size() <= 100
+        && incoming().doctorId is string
+        && incoming().recommendedLens is string;
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if true;
+      allow create: if isValidId(orderId)
+        && incoming().customerName is string && incoming().customerName.size() <= 100
+        && incoming().customerPhone is string && incoming().customerPhone.size() <= 30
+        && incoming().total is number
+        && incoming().paymentMethod is string
+        && incoming().orderStatus is string;
+      allow update: if isValidId(orderId)
+        && incoming().orderStatus is string;
+    }
+
+    // Reviews Collection
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId);
+      allow list: if true;
+      allow create: if isValidId(reviewId)
+        && incoming().patientName is string && incoming().patientName.size() <= 100
+        && incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5
+        && incoming().comment is string && incoming().comment.size() <= 1000
+        && incoming().approved is bool;
+      allow update: if isValidId(reviewId)
+        && incoming().approved is bool;
+    }
+  }
+}

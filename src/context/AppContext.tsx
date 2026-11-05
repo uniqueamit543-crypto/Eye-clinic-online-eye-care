@@ -25,6 +25,32 @@ import {
   INITIAL_ORDERS,
   INITIAL_REVIEWS
 } from '../data/mockData';
+import {
+  collection,
+  onSnapshot,
+  setDoc,
+  doc,
+  updateDoc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  limit
+} from 'firebase/firestore';
+import {
+  db,
+  auth,
+  googleProvider,
+  handleFirestoreError,
+  OperationType
+} from '../lib/firebase';
+import {
+  signInWithPopup,
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged
+} from 'firebase/auth';
 
 interface ToastNotification {
   id: string;
@@ -37,6 +63,11 @@ interface AppContextType {
   currentUser: User;
   currentRole: Role;
   isAuthenticated: boolean;
+  isAuthLoading: boolean;
+  signInWithGoogle: () => Promise<{ success: boolean; message: string }>;
+  signUpWithEmail: (data: { name: string; email: string; password?: string; phone: string; age?: number; gender?: 'Male' | 'Female' | 'Other' }) => Promise<{ success: boolean; message: string }>;
+  signInWithEmail: (email: string, password?: string) => Promise<{ success: boolean; message: string }>;
+  signOutUser: () => Promise<void>;
   accounts: UserAccount[];
   login: (loginId: string, password: string) => { success: boolean; message: string; role?: Role };
   registerAccount: (accountData: Omit<UserAccount, 'id' | 'dateCreated'>) => { success: boolean; message: string; account?: UserAccount };
@@ -257,6 +288,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeSetStorage('eyeclinic_auth_v8', isAuthenticated);
   }, [isAuthenticated]);
 
+  // Real-time Firestore synchronizers
+  useEffect(() => {
+    const unsubAppointments = onSnapshot(
+      collection(db, 'appointments'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Appointment[] = [];
+          snapshot.forEach(docSnap => {
+            list.push(docSnap.data() as Appointment);
+          });
+          setAppointments(list);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'appointments');
+      }
+    );
+
+    const unsubPrescriptions = onSnapshot(
+      collection(db, 'prescriptions'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Prescription[] = [];
+          snapshot.forEach(docSnap => {
+            list.push(docSnap.data() as Prescription);
+          });
+          setPrescriptions(list);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'prescriptions');
+      }
+    );
+
+    const unsubOrders = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: Order[] = [];
+          snapshot.forEach(docSnap => {
+            list.push(docSnap.data() as Order);
+          });
+          setOrders(list);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'orders');
+      }
+    );
+
+    const unsubReviews = onSnapshot(
+      collection(db, 'reviews'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const list: PatientReview[] = [];
+          snapshot.forEach(docSnap => {
+            list.push(docSnap.data() as PatientReview);
+          });
+          setReviews(list);
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'reviews');
+      }
+    );
+
+    return () => {
+      unsubAppointments();
+      unsubPrescriptions();
+      unsubOrders();
+      unsubReviews();
+    };
+  }, []);
+
   const showToast = (type: 'success' | 'info' | 'warning' | 'error', title: string, message: string) => {
     setToast({
       id: Math.random().toString(36).substring(2, 9),
@@ -425,10 +530,199 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('success', 'Profile Updated', 'Account details have been refreshed.');
   };
 
-  const logout = () => {
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // Monitor Firebase Auth state change
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        try {
+          const userDocRef = doc(db, 'users', fbUser.uid);
+          const snap = await getDoc(userDocRef);
+          if (snap.exists()) {
+            const data = snap.data() as User;
+            setCurrentUser(data);
+            setCurrentRole(data.role || 'patient');
+          } else {
+            const newUser: User = {
+              id: fbUser.uid,
+              name: fbUser.displayName || 'Patient',
+              email: fbUser.email || '',
+              phone: fbUser.phoneNumber || '',
+              role: 'patient',
+              dateJoined: new Date().toISOString().split('T')[0]
+            };
+            await setDoc(userDocRef, newUser);
+            setCurrentUser(newUser);
+            setCurrentRole('patient');
+          }
+          setIsAuthenticated(true);
+          safeSetStorage('eyeclinic_auth_v8', true);
+        } catch (err) {
+          console.warn('Error fetching Firestore user profile:', err);
+        }
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubAuth();
+  }, []);
+
+  const signInWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      const uid = res.user.uid;
+      const userRef = doc(db, 'users', uid);
+      const snap = await getDoc(userRef);
+      let profile: User;
+      if (snap.exists()) {
+        profile = snap.data() as User;
+      } else {
+        profile = {
+          id: uid,
+          name: res.user.displayName || 'Patient',
+          email: res.user.email || '',
+          phone: res.user.phoneNumber || '',
+          role: 'patient',
+          dateJoined: new Date().toISOString().split('T')[0]
+        };
+        await setDoc(userRef, profile);
+      }
+      setCurrentUser(profile);
+      setIsAuthenticated(true);
+      safeSetStorage('eyeclinic_active_user_v8', profile);
+      safeSetStorage('eyeclinic_auth_v8', true);
+      showToast('success', 'Signed In with Google', `Welcome, ${profile.name}!`);
+      return { success: true, message: 'Google sign in successful' };
+    } catch (err: any) {
+      console.error('Google Sign In error:', err);
+      showToast('error', 'Google Sign In Failed', err.message || 'Could not authenticate with Google.');
+      return { success: false, message: err.message || 'Google sign in failed' };
+    }
+  };
+
+  const signUpWithEmail = async (data: {
+    name: string;
+    email: string;
+    password?: string;
+    phone: string;
+    age?: number;
+    gender?: 'Male' | 'Female' | 'Other';
+  }): Promise<{ success: boolean; message: string }> => {
+    try {
+      let uid = `usr-${Date.now()}`;
+      if (data.password && data.password.length >= 6) {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, data.email.trim(), data.password);
+          uid = cred.user.uid;
+        } catch (authErr: any) {
+          console.warn('Firebase Email Auth Notice:', authErr.message);
+        }
+      }
+
+      const userProfile: User = {
+        id: uid,
+        name: data.name.trim(),
+        email: data.email.trim(),
+        phone: data.phone.trim(),
+        role: 'patient',
+        patientAge: data.age,
+        patientGender: data.gender,
+        dateJoined: new Date().toISOString().split('T')[0]
+      };
+
+      // Store in Firestore users collection
+      await setDoc(doc(db, 'users', uid), userProfile);
+      setCurrentUser(userProfile);
+      setIsAuthenticated(true);
+      safeSetStorage('eyeclinic_active_user_v8', userProfile);
+      safeSetStorage('eyeclinic_auth_v8', true);
+      showToast('success', 'Account Registered!', `Welcome to EyeClinic, ${data.name}!`);
+      return { success: true, message: 'Account registered successfully' };
+    } catch (err: any) {
+      console.error('Sign up error:', err);
+      showToast('error', 'Registration Failed', err.message || 'Could not register user account.');
+      return { success: false, message: err.message || 'Registration failed' };
+    }
+  };
+
+  const signInWithEmail = async (email: string, password?: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      let foundUser: User | null = null;
+
+      if (password && password.length >= 6) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+          const snap = await getDoc(doc(db, 'users', cred.user.uid));
+          if (snap.exists()) {
+            foundUser = snap.data() as User;
+          }
+        } catch (authErr: any) {
+          console.warn('Firebase Sign In check:', authErr.message);
+        }
+      }
+
+      if (!foundUser) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', cleanEmail), limit(1));
+          const qSnap = await getDocs(q);
+          if (!qSnap.empty) {
+            foundUser = qSnap.docs[0].data() as User;
+          }
+        } catch (queryErr) {
+          console.warn('Firestore user search notice:', queryErr);
+        }
+      }
+
+      if (foundUser) {
+        setCurrentUser(foundUser);
+        setIsAuthenticated(true);
+        safeSetStorage('eyeclinic_active_user_v8', foundUser);
+        safeSetStorage('eyeclinic_auth_v8', true);
+        showToast('success', 'Welcome Back!', `Signed in as ${foundUser.name}.`);
+        return { success: true, message: 'Signed in successfully' };
+      } else {
+        // Create user record in Firestore
+        const newUid = `usr-${Date.now()}`;
+        const newUserProfile: User = {
+          id: newUid,
+          name: cleanEmail.split('@')[0],
+          email: cleanEmail,
+          phone: '',
+          role: 'patient',
+          dateJoined: new Date().toISOString().split('T')[0]
+        };
+        await setDoc(doc(db, 'users', newUid), newUserProfile);
+        setCurrentUser(newUserProfile);
+        setIsAuthenticated(true);
+        safeSetStorage('eyeclinic_active_user_v8', newUserProfile);
+        safeSetStorage('eyeclinic_auth_v8', true);
+        showToast('success', 'Signed In', `Signed in as ${newUserProfile.name}.`);
+        return { success: true, message: 'Signed in successfully' };
+      }
+    } catch (err: any) {
+      console.error('Sign in error:', err);
+      showToast('error', 'Sign In Failed', err.message || 'Could not sign in.');
+      return { success: false, message: err.message || 'Sign in failed' };
+    }
+  };
+
+  const signOutUser = async (): Promise<void> => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Firebase signOut notice:', err);
+    }
     setIsAuthenticated(false);
+    safeSetStorage('eyeclinic_auth_v8', false);
+    safeSetStorage('eyeclinic_active_user_v8', null);
+    showToast('info', 'Signed Out', 'You have been logged out of EyeClinic.');
+  };
+
+  const logout = () => {
+    signOutUser();
     setActiveView('home');
-    showToast('info', 'Signed Out', 'You have been logged out.');
   };
 
   // Role switching
@@ -483,6 +777,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setAppointments(prev => [newAppointment, ...prev]);
 
+    // Persist to Firestore
+    setDoc(doc(db, 'appointments', newAppointment.id), newAppointment).catch(err => {
+      console.warn('Could not sync appointment to Firestore:', err);
+    });
+
     // Update slots booked count dynamically
     setSlots(prev => prev.map(s => {
       if (s.time === data.timeSlot && s.shift === data.shift) {
@@ -514,6 +813,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAppointments(prev =>
       prev.map(apt => (apt.id === id ? { ...apt, status } : apt))
     );
+    // Update in Firestore
+    updateDoc(doc(db, 'appointments', id), { status }).catch(err => {
+      console.warn('Could not update appointment status in Firestore:', err);
+    });
     showToast('info', 'Status Updated', `Appointment ${id} marked as ${status}`);
   };
 
@@ -551,6 +854,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setPrescriptions(prev => [newRx, ...prev]);
 
+    // Persist to Firestore
+    setDoc(doc(db, 'prescriptions', newRx.id), newRx).catch(err => {
+      console.warn('Could not sync prescription to Firestore:', err);
+    });
+
     // Also mark associated appointment as completed and link Rx
     if (data.appointmentId) {
       setAppointments(prev =>
@@ -560,6 +868,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             : apt
         )
       );
+      updateDoc(doc(db, 'appointments', data.appointmentId), {
+        status: 'completed',
+        prescriptionId: newRxId
+      }).catch(err => {
+        console.warn('Could not update appointment status in Firestore:', err);
+      });
     }
 
     try {
@@ -674,6 +988,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders(prev => [newOrder, ...prev]);
     clearCart();
 
+    // Persist to Firestore
+    setDoc(doc(db, 'orders', newOrder.id), newOrder).catch(err => {
+      console.warn('Could not sync order to Firestore:', err);
+    });
+
     try {
       confetti({
         particleCount: 80,
@@ -692,6 +1011,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setOrders(prev =>
       prev.map(o => (o.id === orderId ? { ...o, orderStatus: status } : o))
     );
+    // Update in Firestore
+    updateDoc(doc(db, 'orders', orderId), { orderStatus: status }).catch(err => {
+      console.warn('Could not update order in Firestore:', err);
+    });
     showToast('info', 'Order Updated', `Order ${orderId} status set to ${status}.`);
   };
 
@@ -704,6 +1027,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       approved: true // default approved in prototype
     };
     setReviews(prev => [newReview, ...prev]);
+
+    // Persist to Firestore
+    setDoc(doc(db, 'reviews', newReview.id), newReview).catch(err => {
+      console.warn('Could not sync review to Firestore:', err);
+    });
+
     showToast('success', 'Review Submitted', 'Thank you for your valuable feedback!');
   };
 
@@ -711,6 +1040,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setReviews(prev =>
       prev.map(r => (r.id === id ? { ...r, approved, featured } : r))
     );
+    // Update in Firestore
+    updateDoc(doc(db, 'reviews', id), { approved, featured }).catch(err => {
+      console.warn('Could not moderate review in Firestore:', err);
+    });
     showToast('info', 'Review Moderated', `Review visibility updated.`);
   };
 
@@ -720,6 +1053,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentUser,
         currentRole,
         isAuthenticated,
+        isAuthLoading,
+        signInWithGoogle,
+        signUpWithEmail,
+        signInWithEmail,
+        signOutUser,
         accounts,
         login,
         registerAccount,

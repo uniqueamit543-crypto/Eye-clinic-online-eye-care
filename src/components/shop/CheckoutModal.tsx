@@ -30,8 +30,8 @@ export const CheckoutModal: React.FC = () => {
   // Form states
   const [customerName, setCustomerName] = useState(currentUser.name || 'Aditya Sharma');
   const [customerPhone, setCustomerPhone] = useState(currentUser.phone || '+91 98765 43210');
-  const [customerEmail, setCustomerEmail] = useState(currentUser.email || 'aditya.sharma@niu.edu.in');
-  const [street, setStreet] = useState('Hostel Block B, Room 314, NIU Campus, Plot 1');
+  const [customerEmail, setCustomerEmail] = useState(currentUser.email || 'aditya.sharma@example.com');
+  const [street, setStreet] = useState('Flat 402, Lotus Greens, Sector 29');
   const [city, setCity] = useState('Greater Noida');
   const [state, setState] = useState('Uttar Pradesh');
   const [pincode, setPincode] = useState('203201');

@@ -40,6 +40,7 @@ export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancell
 
 export interface Appointment {
   id: string;
+  userId?: string;
   patientId: string;
   patientName: string;
   patientPhone: string;

@@ -16,7 +16,7 @@ import { PatientDashboard } from './components/patient/PatientDashboard';
 
 // Modals
 import { BookAppointmentModal } from './components/appointments/BookAppointmentModal';
-import { AuthModal } from './components/auth/AuthModal';
+import { UserAuthModal } from './components/auth/UserAuthModal';
 import { WritePrescriptionModal } from './components/doctor/WritePrescriptionModal';
 import { ProductDetailModal } from './components/shop/ProductDetailModal';
 import { CartDrawer } from './components/shop/CartDrawer';
@@ -45,7 +45,7 @@ const AppContent: React.FC = () => {
 
       {/* Global Modals & Drawers */}
       <BookAppointmentModal />
-      <AuthModal />
+      <UserAuthModal />
       <WritePrescriptionModal />
       <ProductDetailModal />
       <CartDrawer />
